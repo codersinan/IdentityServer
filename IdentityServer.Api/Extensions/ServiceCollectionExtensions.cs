@@ -1,4 +1,6 @@
+using FluentValidation.AspNetCore;
 using IdentityServer.Data;
+using IdentityServer.Infrastructure.RequestModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +47,10 @@ namespace IdentityServer.Api.Extensions
                     options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
                     options.SerializerSettings.DefaultValueHandling = DefaultValueHandling.Ignore;
                     options.SerializerSettings.DateTimeZoneHandling = DateTimeZoneHandling.Utc;
+                })
+                .AddFluentValidation(options =>
+                {
+                    options.RegisterValidatorsFromAssembly(typeof(SignUpRequest).Assembly);
                 });
         }
 
