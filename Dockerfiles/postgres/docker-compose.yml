@@ -1,0 +1,14 @@
+version: '3'
+services:
+  identityserver-postgres:
+    container_name: 'identity-postgres'
+    image: 'postgres:12-alpine'
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_DB=IdentityServer
+      - POSTGRES_USER=identity
+      - POSTGRES_PASSWORD=server
+    volumes:
+      - ./init-user-db.sh:/docker-entrypoint-initdb.d/initdb.sh
