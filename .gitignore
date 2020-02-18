@@ -1,0 +1,7 @@
+bin/
+obj/
+/packages/
+.idea/
+.sonarqube/
+lcov.*
+sonar-token.txt
