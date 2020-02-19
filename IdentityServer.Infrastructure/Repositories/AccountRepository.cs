@@ -27,6 +27,7 @@ namespace IdentityServer.Infrastructure.Repositories
                 throw new InvalidOperationException(nameof(account.Username) + " or " + nameof(account.UserMail) +
                                                     " already used");
             account = GenerateSaltAndHashPassword(account);
+            account = GenerateActivationToken(account);
 
             _context.Set<Account>().Add(account);
             _context.SaveChanges();
@@ -42,20 +43,49 @@ namespace IdentityServer.Infrastructure.Repositories
                 throw new InvalidOperationException(nameof(account.Username) + " or " + nameof(account.UserMail) +
                                                     " already used");
             account = GenerateSaltAndHashPassword(account);
+            account = GenerateActivationToken(account);
 
             await _context.Set<Account>().AddAsync(account);
             await _context.SaveChangesAsync();
             return account;
         }
 
+        public bool CheckActivationToken(Guid token)
+        {
+            var exits = _context.Accounts.FirstOrDefault(x => x.ActivationToken == token && x.IsActive == null);
+            return exits != null;
+        }
+
+        public void ActivateAccount(Guid token)
+        {
+            var exits = _context.Accounts.FirstOrDefault(x => x.ActivationToken == token && x.IsActive == null);
+            if (exits!=null)
+            {
+                exits.IsActive = true;
+                _context.SaveChanges();
+            }
+            else
+            {
+                throw new InvalidOperationException();
+            }
+            
+        }
+
         private void CheckAccountIsNull(Account account)
         {
             if (account == null) throw new ArgumentNullException(nameof(account));
         }
+
         private Account GenerateSaltAndHashPassword(Account account)
         {
             account.PasswordSalt = PasswordHelper.GenerateSalt();
             account.PasswordHash = PasswordHelper.HashPassword(account.PasswordSalt, account.PasswordHash);
+            return account;
+        }
+
+        private Account GenerateActivationToken(Account account)
+        {
+            account.ActivationToken = Guid.NewGuid();
             return account;
         }
     }
