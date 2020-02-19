@@ -1,15 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using IdentityServer.Api.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace IdentityServer.Api
 {
@@ -26,6 +20,7 @@ namespace IdentityServer.Api
                 .AddJsonFile($"{settings}.{environment.EnvironmentName}.json", true, true);
 
             builder.AddEnvironmentVariables();
+            
             Configuration = builder.Build();
         }
 
@@ -34,7 +29,19 @@ namespace IdentityServer.Api
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddHealthChecksConfiguration();
+
+            services.AddCorsConfiguration();
+
+            services.AddApiVersioningConfiguration();
+
+            services.AddAutoMapperConfiguration();
+            
+            services.AddDbContextConfiguration(Configuration);
+            
+            services.AddControllersConfiguration();
+            
+            services.AddRepositories();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -45,7 +52,8 @@ namespace IdentityServer.Api
                 app.UseDeveloperExceptionPage();
             }
 
-            app.UseHttpsRedirection();
+            app.UseHealthChecks("/health");
+            app.UseCors("IdentityServer");
 
             app.UseRouting();
 
