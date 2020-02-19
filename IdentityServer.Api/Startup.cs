@@ -35,9 +35,13 @@ namespace IdentityServer.Api
 
             services.AddApiVersioningConfiguration();
 
+            services.AddAutoMapperConfiguration();
+            
             services.AddDbContextConfiguration(Configuration);
             
             services.AddControllersConfiguration();
+            
+            services.AddRepositories();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

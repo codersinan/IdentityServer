@@ -1,5 +1,9 @@
+using AutoMapper;
 using FluentValidation.AspNetCore;
 using IdentityServer.Data;
+using IdentityServer.Infrastructure.Interfaces;
+using IdentityServer.Infrastructure.Mappings;
+using IdentityServer.Infrastructure.Repositories;
 using IdentityServer.Infrastructure.RequestModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
@@ -61,6 +65,16 @@ namespace IdentityServer.Api.Extensions
                 options.UseNpgsql(configuration.GetConnectionString("IdentityServer"));
                 options.EnableSensitiveDataLogging(true);
             });
+        }
+
+        public static void AddAutoMapperConfiguration(this IServiceCollection services)
+        {
+            services.AddAutoMapper(typeof(SignUpRequestMapping).Assembly);
+        }
+
+        public static void AddRepositories(this IServiceCollection services)
+        {
+            services.AddTransient<IAccountRepository, AccountRepository>();
         }
     }
 }
