@@ -4,8 +4,10 @@ namespace IdentityServer.Infrastructure.Tests.Validators
     {
         NotNullValidator,
         NotEmptyValidator,
+        EqualValidator,
         EmailValidator,
         MinimumLengthValidator,
         MaximumLengthValidator,
+        
     }
 }

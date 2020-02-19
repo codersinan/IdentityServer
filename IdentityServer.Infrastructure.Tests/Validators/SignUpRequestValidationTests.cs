@@ -19,21 +19,21 @@ namespace IdentityServer.Infrastructure.Tests.Validators
         }
 
         [Test]
-        public void ValidateAllParametersAreNull()
+        public void ValidateRequestAllParametersAreNull()
         {
-            var request = new SignUpRequest()
+            var request = new SignUpRequest
             {
             };
 
             var result = _validator.Validate(request);
-            result.IsValid.Should().Be(false);
+            result.IsValid.Should().BeFalse();
 
             var errors = result.Errors.Any(x => x.ErrorCode == ValidationErrorCodes.NotNullValidator.ToString());
-            errors.Should().Be(true);
+            errors.Should().BeTrue();
         }
 
         [Test]
-        public void ValidateAllParametersAreEmpty()
+        public void ValidateRequestAllParametersAreEmpty()
         {
             var request = new SignUpRequest
             {
@@ -44,10 +44,61 @@ namespace IdentityServer.Infrastructure.Tests.Validators
             };
 
             var result = _validator.Validate(request);
-            result.IsValid.Should().Be(false);
+            result.IsValid.Should().BeFalse();
 
             var errors = result.Errors.Any(x => x.ErrorCode == ValidationErrorCodes.NotEmptyValidator.ToString());
-            errors.Should().Be(true);
+            errors.Should().BeTrue();
+        }
+
+        [Test]
+        public void ValidateRequestUserMailIsInvalid()
+        {
+            var request = new SignUpRequest
+            {
+                Username = "a",
+                UserMail = "a",
+                Password = "123",
+                ConfirmPassword = "123"
+            };
+
+            var result = _validator.Validate(request);
+            result.IsValid.Should().BeFalse();
+
+            var errors = result.Errors.Any(x => x.ErrorCode == ValidationErrorCodes.EmailValidator.ToString());
+            errors.Should().BeTrue();
+        }
+        
+        [Test]
+        public void ValidateRequestPasswordAndConfirmPasswordIsNotEqual()
+        {
+            var request = new SignUpRequest
+            {
+                Username = "a",
+                UserMail = "a@a.com",
+                Password = "123",
+                ConfirmPassword = "124"
+            };
+
+            var result = _validator.Validate(request);
+            result.IsValid.Should().BeFalse();
+
+            var errors = result.Errors.Any(x => x.ErrorCode == ValidationErrorCodes.EqualValidator.ToString());
+            errors.Should().BeTrue();
+        }
+        
+        [Test]
+        public void ValidateRequestAllParametersAreValid()
+        {
+            var request = new SignUpRequest
+            {
+                Username = "a",
+                UserMail = "a@a.com",
+                Password = "123",
+                ConfirmPassword = "123"
+            };
+
+            var result = _validator.Validate(request);
+            result.IsValid.Should().BeTrue();
         }
     }
 }
