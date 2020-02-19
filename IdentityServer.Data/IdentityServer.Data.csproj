@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\IdentityServer.Infrastructure\IdentityServer.Infrastructure.csproj" />
+      <ProjectReference Include="..\IdentityServer.Core\IdentityServer.Core.csproj" />
     </ItemGroup>
 
 </Project>
