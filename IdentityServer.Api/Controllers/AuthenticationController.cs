@@ -32,9 +32,51 @@ namespace IdentityServer.Api.Controllers
                 }
 
                 var account = _mapper.Map<Account>(request);
-                account=await _accountRepository.SignUpAsync(account);
+                account = await _accountRepository.SignUpAsync(account);
                 // TODO Mail send integration
-                
+
+                return Ok();
+            }
+            catch (Exception e)
+            {
+                ModelState.AddModelError("Exception", e.Message);
+            }
+
+            return BadRequest(ModelState);
+        }
+
+        [HttpGet("activation/{activationToken}")]
+        public IActionResult CheckActivationToken(string activationToken)
+        {
+            try
+            {
+                Guid token = Guid.Parse(activationToken);
+
+                var isValid = _accountRepository.CheckActivationToken(token);
+                if (isValid)
+                {
+                    return Ok();
+                }
+                else
+                {
+                    ModelState.AddModelError("Error","Token is not valid");
+                }
+            }
+            catch (Exception e)
+            {
+                ModelState.AddModelError("Exception", e.Message);
+            }
+
+            return BadRequest(ModelState);
+        }
+
+        [HttpPost("activation/{activationToken}")]
+        public IActionResult ActivateAccount(string activationToken)
+        {
+            try
+            {
+                Guid token = Guid.Parse(activationToken);
+                _accountRepository.ActivateAccount(token);
                 return Ok();
             }
             catch (Exception e)
