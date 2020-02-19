@@ -1,3 +1,5 @@
+using System;
+
 namespace IdentityServer.Core.Entities
 {
     public class Account : BaseEntity
@@ -6,6 +8,7 @@ namespace IdentityServer.Core.Entities
         public string UserMail { get; set; }
         public string PasswordSalt { get; set; }
         public string PasswordHash { get; set; }
+        public Guid ActivationToken { get; set; }
         public bool? IsActive { get; set; }
     }
 }
