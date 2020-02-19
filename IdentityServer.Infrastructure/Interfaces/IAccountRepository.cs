@@ -11,5 +11,8 @@ namespace IdentityServer.Infrastructure.Interfaces
 
         bool CheckActivationToken(Guid token);
         void ActivateAccount(Guid token);
+
+        Account SignIn(Account account);
+        Task<Account> SignInAsync(Account account);
     }
 }

@@ -59,7 +59,7 @@ namespace IdentityServer.Infrastructure.Repositories
         public void ActivateAccount(Guid token)
         {
             var exits = _context.Accounts.FirstOrDefault(x => x.ActivationToken == token && x.IsActive == null);
-            if (exits!=null)
+            if (exits != null)
             {
                 exits.IsActive = true;
                 _context.SaveChanges();
@@ -68,7 +68,30 @@ namespace IdentityServer.Infrastructure.Repositories
             {
                 throw new InvalidOperationException();
             }
-            
+        }
+
+        public Account SignIn(Account account)
+        {
+            var exists = _context.Accounts.FirstOrDefault(x => x.Username == account.Username && x.IsActive == true);
+            if (exists != null &&
+                PasswordHelper.ValidateHashPassword(exists.PasswordSalt, account.PasswordHash, exists.PasswordHash))
+            {
+                return exists;
+            }
+
+            return null;
+        }
+
+        public async Task<Account> SignInAsync(Account account)
+        {
+            var exits = await _context.Accounts.FirstOrDefaultAsync(x => x.Username == account.Username && x.IsActive == true);
+            if (exits != null &&
+                PasswordHelper.ValidateHashPassword(exits.PasswordSalt, account.PasswordHash, exits.PasswordHash))
+            {
+                return exits;
+            }
+
+            return null;
         }
 
         private void CheckAccountIsNull(Account account)
