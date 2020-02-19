@@ -19,7 +19,8 @@ namespace IdentityServer.Data.Tests
 
             var migrations = new List<Migration>()
             {
-                new AccountTable()
+                new AccountTable(),
+                new AccountTableAddActivationTokenColumn()
             };
 
             foreach (var migration in migrations)
