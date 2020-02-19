@@ -98,7 +98,7 @@ namespace IdentityServer.Api.Tests.Controllers
         }
 
         [Test]
-        public void CheckActivationTokenWithInvalidToken()
+        public void CheckActivationTokenWithNotAGuid()
         {
             // arrange
 
@@ -107,6 +107,20 @@ namespace IdentityServer.Api.Tests.Controllers
             // assert
             _controller
                 .Invoking(m => m.CheckActivationToken(string.Empty))
+                .Invoke()
+                .Should().BeOfType<BadRequestObjectResult>();
+        }
+        
+        [Test]
+        public void CheckActivationTokenWithInvalidToken()
+        {
+            // arrange
+
+            // act
+
+            // assert
+            _controller
+                .Invoking(m => m.CheckActivationToken(Guid.NewGuid().ToString()))
                 .Invoke()
                 .Should().BeOfType<BadRequestObjectResult>();
         }
@@ -137,7 +151,7 @@ namespace IdentityServer.Api.Tests.Controllers
         }
 
         [Test]
-        public void ActivateAccountWithInvalidToken()
+        public void ActivateAccountWithNotAGuid()
         {
             // arrange
 
@@ -146,6 +160,20 @@ namespace IdentityServer.Api.Tests.Controllers
             // assert
             _controller
                 .Invoking(m => m.ActivateAccount(string.Empty))
+                .Invoke()
+                .Should().BeOfType<BadRequestObjectResult>();
+        }
+        
+        [Test]
+        public void ActivateAccountWithInvalidToken()
+        {
+            // arrange
+
+            // act
+
+            // assert
+            _controller
+                .Invoking(m => m.ActivateAccount(Guid.NewGuid().ToString()))
                 .Invoke()
                 .Should().BeOfType<BadRequestObjectResult>();
         }
@@ -172,6 +200,89 @@ namespace IdentityServer.Api.Tests.Controllers
             _controller
                 .Invoking(m => m.ActivateAccount(account.ActivationToken.ToString()))
                 .Invoke()
+                .Should().BeOfType<OkResult>();
+        }
+
+        [Test]
+        public void SignInWithNewControllerWithoutConstructorParameters()
+        {
+            // arrange
+            var request = new SignInRequest
+            {
+                Username = "a",
+                Password = "123",
+            };
+
+            var controller = new AuthenticationController(null, null);
+            // act
+
+            // assert
+            controller.SignIn(request).Result
+                .Should().BeOfType<BadRequestObjectResult>();
+        }
+        
+        [Test]
+        public void SignInWithInvalidParameters()
+        {
+            // arrange
+            var request = new SignUpRequest
+            {
+            };
+            // act
+            _controller.ModelState.AddModelError("Exception", "Error");
+            // assert
+            _controller.SignUp(request).Result
+                .Should().BeOfType<BadRequestObjectResult>();
+        }
+        
+        [Test]
+        public void SignInWithValidParametersButPasswordIsWrong()
+        {
+            // arrange
+            var request = new SignUpRequest
+            {
+                Username = "a",
+                UserMail = "a@a.com",
+                Password = "123",
+                ConfirmPassword = "123"
+            };
+            var context = _serviceProvider.GetService<IdentityServerContext>();
+            Account account = null;
+            // act
+            _controller
+                .Invoking(m => m.SignUp(request))
+                .Invoke();
+            account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
+            _controller.ActivateAccount(account.ActivationToken.ToString());
+            // assert
+            _controller.Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password.Insert(1,"wrong")}))
+                .Invoke().Result
+                .Should().BeOfType<UnauthorizedResult>();
+        }
+
+        [Test]
+        public void SignInWithValidParameters()
+        {
+            // arrange
+            var request = new SignUpRequest
+            {
+                Username = "a",
+                UserMail = "a@a.com",
+                Password = "123",
+                ConfirmPassword = "123"
+            };
+            var context = _serviceProvider.GetService<IdentityServerContext>();
+            Account account = null;
+            // act
+            _controller
+                .Invoking(m => m.SignUp(request))
+                .Invoke();
+            account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
+            _controller.ActivateAccount(account.ActivationToken.ToString());
+            // assert
+
+            _controller.Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
+                .Invoke().Result
                 .Should().BeOfType<OkResult>();
         }
     }

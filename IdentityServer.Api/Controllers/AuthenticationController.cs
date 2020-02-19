@@ -59,7 +59,7 @@ namespace IdentityServer.Api.Controllers
                 }
                 else
                 {
-                    ModelState.AddModelError("Error","Token is not valid");
+                    ModelState.AddModelError("Error", "Token is not valid");
                 }
             }
             catch (Exception e)
@@ -77,6 +77,35 @@ namespace IdentityServer.Api.Controllers
             {
                 Guid token = Guid.Parse(activationToken);
                 _accountRepository.ActivateAccount(token);
+                return Ok();
+            }
+            catch (Exception e)
+            {
+                ModelState.AddModelError("Exception", e.Message);
+            }
+
+            return BadRequest(ModelState);
+        }
+
+        [HttpPost("SignIn")]
+        public async Task<IActionResult> SignIn(SignInRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var account = _mapper.Map<Account>(request);
+                account = await _accountRepository.SignInAsync(account);
+
+                if (account == null)
+                {
+                    return Unauthorized();
+                }
+                
+                // TODO Integrate Jwt token authentication
                 return Ok();
             }
             catch (Exception e)
