@@ -1,7 +1,10 @@
 using System.IO;
 using FluentAssertions;
+using IdentityServer.Api.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using NUnit.Framework;
 
@@ -26,13 +29,20 @@ namespace IdentityServer.Api.Tests
                 WebRootFileProvider = new NullFileProvider(),
             };
 
-            var builder = new WebHostBuilder()
+            var settings = "appsettings";
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile($"{settings}.json")
+                .AddEnvironmentVariables();
+            IConfiguration configuration = builder.Build();
+            var webHostBuilder = new WebHostBuilder()
                 .UseEnvironment("Development")
+                .UseConfiguration(configuration)
                 .UseKestrel()
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .UseStartup<Startup>();
 
-            _server = new TestServer(builder);
+            _server = new TestServer(webHostBuilder);
         }
 
         [Test]
@@ -44,7 +54,7 @@ namespace IdentityServer.Api.Tests
         [Test]
         public void GetConfiguration()
         {
-            var startup=new Startup(_environment);
+            var startup = new Startup(_environment);
 
             startup.Configuration.Should().NotBeNull();
         }

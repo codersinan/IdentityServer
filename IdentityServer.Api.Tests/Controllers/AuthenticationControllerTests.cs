@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
 using AutoMapper;
 using FluentAssertions;
 using IdentityServer.Api.Controllers;
 using IdentityServer.Api.Extensions;
+using IdentityServer.Api.Security;
 using IdentityServer.Core.Entities;
 using IdentityServer.Data;
 using IdentityServer.Infrastructure.Interfaces;
@@ -12,8 +14,10 @@ using IdentityServer.Infrastructure.Repositories;
 using IdentityServer.Infrastructure.RequestModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using IConfiguration = AutoMapper.Configuration.IConfiguration;
 
 namespace IdentityServer.Api.Tests.Controllers
 {
@@ -26,6 +30,10 @@ namespace IdentityServer.Api.Tests.Controllers
         [SetUp]
         public void SetUp()
         {
+            var settings = "appsettings";
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile($"{settings}.json");
             var serviceCollection = new ServiceCollection();
             serviceCollection.AddDbContext<IdentityServerContext>(options =>
             {
@@ -35,12 +43,13 @@ namespace IdentityServer.Api.Tests.Controllers
             serviceCollection.AddAutoMapper(typeof(SignUpRequestMapping).Assembly);
             serviceCollection.AddTransient<IAccountRepository, AccountRepository>();
             serviceCollection.AddControllersConfiguration();
+            serviceCollection.AddAuthenticationConfiguration(builder.Build());
             _serviceProvider = serviceCollection.BuildServiceProvider();
 
             var repository = _serviceProvider.GetService<IAccountRepository>();
             var mapper = _serviceProvider.GetService<IMapper>();
-
-            _controller = new AuthenticationController(repository, mapper);
+            var tokenHelper = _serviceProvider.GetService<ITokenHelper>();
+            _controller = new AuthenticationController(repository, mapper, tokenHelper);
         }
 
         [Test]
@@ -55,7 +64,7 @@ namespace IdentityServer.Api.Tests.Controllers
                 ConfirmPassword = "123"
             };
 
-            var controller = new AuthenticationController(null, null);
+            var controller = new AuthenticationController(null, null, null);
             // act
 
             // assert
@@ -110,7 +119,7 @@ namespace IdentityServer.Api.Tests.Controllers
                 .Invoke()
                 .Should().BeOfType<BadRequestObjectResult>();
         }
-        
+
         [Test]
         public void CheckActivationTokenWithInvalidToken()
         {
@@ -163,7 +172,7 @@ namespace IdentityServer.Api.Tests.Controllers
                 .Invoke()
                 .Should().BeOfType<BadRequestObjectResult>();
         }
-        
+
         [Test]
         public void ActivateAccountWithInvalidToken()
         {
@@ -213,14 +222,14 @@ namespace IdentityServer.Api.Tests.Controllers
                 Password = "123",
             };
 
-            var controller = new AuthenticationController(null, null);
+            var controller = new AuthenticationController(null, null, null);
             // act
 
             // assert
             controller.SignIn(request).Result
                 .Should().BeOfType<BadRequestObjectResult>();
         }
-        
+
         [Test]
         public void SignInWithInvalidParameters()
         {
@@ -234,7 +243,7 @@ namespace IdentityServer.Api.Tests.Controllers
             _controller.SignUp(request).Result
                 .Should().BeOfType<BadRequestObjectResult>();
         }
-        
+
         [Test]
         public void SignInWithValidParametersButPasswordIsWrong()
         {
@@ -255,7 +264,8 @@ namespace IdentityServer.Api.Tests.Controllers
             account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
             _controller.ActivateAccount(account.ActivationToken.ToString());
             // assert
-            _controller.Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password.Insert(1,"wrong")}))
+            _controller.Invoking(m => m.SignIn(new SignInRequest
+                    {Username = "a", Password = request.Password.Insert(1, "wrong")}))
                 .Invoke().Result
                 .Should().BeOfType<UnauthorizedResult>();
         }
@@ -281,9 +291,11 @@ namespace IdentityServer.Api.Tests.Controllers
             _controller.ActivateAccount(account.ActivationToken.ToString());
             // assert
 
-            _controller.Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
-                .Invoke().Result
-                .Should().BeOfType<OkResult>();
+            var result = _controller
+                .Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
+                .Invoke().Result;
+            result.Should().BeOfType<OkObjectResult>();
+            ((TokenResponse)((OkObjectResult) result).Value).AccessToken.Should().NotBeNull();
         }
     }
 }
