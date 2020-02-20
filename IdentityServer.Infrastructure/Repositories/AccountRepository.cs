@@ -94,6 +94,12 @@ namespace IdentityServer.Infrastructure.Repositories
             return null;
         }
 
+        public Account GetAccountById(Guid id)
+        {
+           var exists= _context.Accounts.FirstOrDefault(x => x.Id == id);
+           return exists;
+        }
+
         private void CheckAccountIsNull(Account account)
         {
             if (account == null) throw new ArgumentNullException(nameof(account));

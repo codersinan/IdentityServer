@@ -1,9 +1,13 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
+using IdentityServer.Api.Security;
 using IdentityServer.Core.Entities;
 using IdentityServer.Infrastructure.Interfaces;
 using IdentityServer.Infrastructure.RequestModels;
+using IdentityServer.Infrastructure.ResponseModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityServer.Api.Controllers
@@ -14,11 +18,13 @@ namespace IdentityServer.Api.Controllers
     {
         private readonly IAccountRepository _accountRepository;
         private readonly IMapper _mapper;
+        private readonly ITokenHelper _tokenHelper;
 
-        public AuthenticationController(IAccountRepository accountRepository, IMapper mapper)
+        public AuthenticationController(IAccountRepository accountRepository, IMapper mapper,ITokenHelper tokenHelper)
         {
             _accountRepository = accountRepository;
             _mapper = mapper;
+            _tokenHelper = tokenHelper;
         }
 
         [HttpPost("SignUp")]
@@ -104,9 +110,8 @@ namespace IdentityServer.Api.Controllers
                 {
                     return Unauthorized();
                 }
-                
-                // TODO Integrate Jwt token authentication
-                return Ok();
+
+                return Ok(_tokenHelper.GenerateToken(account));
             }
             catch (Exception e)
             {
@@ -115,5 +120,27 @@ namespace IdentityServer.Api.Controllers
 
             return BadRequest(ModelState);
         }
+        
+        [HttpGet("Account"),Authorize]
+        public IActionResult CurrentAccount()
+        {
+            try
+            {
+                var claims = User.Claims;
+                var userId = claims.FirstOrDefault(x => x.Type == "Id")?.Value;
+                if (userId == null) return Unauthorized();
+                Guid id = Guid.Parse(userId);
+                var account = _accountRepository.GetAccountById(id);
+                if (account == null) return Unauthorized();
+                return Ok(_mapper.Map<CurrentAccount>(account));
+            }
+            catch (Exception e)
+            {
+                ModelState.AddModelError("Exception",e.Message);
+            }
+
+            return BadRequest(ModelState);
+        }
+        
     }
 }

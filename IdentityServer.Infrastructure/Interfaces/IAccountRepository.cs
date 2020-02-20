@@ -14,5 +14,7 @@ namespace IdentityServer.Infrastructure.Interfaces
 
         Account SignIn(Account account);
         Task<Account> SignInAsync(Account account);
+
+        Account GetAccountById(Guid id);
     }
 }
