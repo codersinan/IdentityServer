@@ -91,9 +91,12 @@ namespace IdentityServer.Api.Extensions
                     Title = "Identity Server",
                     Version = "v1"
                 });
-                
+
                 options.SchemaFilter<SwaggerFluentValidationSchemaFilter>();
-                
+
+                #region Swagger Security
+
+                // TODO doesn't work correct.It has authentication problem doesn't send authorization header correctly
                 var securitySchema = new OpenApiSecurityScheme
                 {
                     Name = "Authentication",
@@ -114,11 +117,14 @@ namespace IdentityServer.Api.Extensions
                                 Id = "Bearer",
                                 Type = ReferenceType.SecurityScheme
                             }
-                        },  
+                        },
                         new List<string> { }
                     }
                 });
-                
+
+                #endregion
+
+
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 options.IncludeXmlComments(xmlPath);
