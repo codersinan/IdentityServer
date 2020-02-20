@@ -1,19 +1,24 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using AutoMapper;
 using FluentValidation.AspNetCore;
 using IdentityServer.Api.Helpers;
+using IdentityServer.Api.Security;
 using IdentityServer.Data;
 using IdentityServer.Infrastructure.Interfaces;
 using IdentityServer.Infrastructure.Mappings;
 using IdentityServer.Infrastructure.Repositories;
 using IdentityServer.Infrastructure.RequestModels;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 
@@ -81,18 +86,77 @@ namespace IdentityServer.Api.Extensions
         {
             services.AddSwaggerGen(options =>
             {
-                options.SwaggerDoc("v1",new OpenApiInfo
+                options.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Title = "Identity Server",
                     Version = "v1"
                 });
                 
+                options.SchemaFilter<SwaggerFluentValidationSchemaFilter>();
+                
+                var securitySchema = new OpenApiSecurityScheme
+                {
+                    Name = "Authentication",
+                    Description = "Identity Server Authentication",
+                    Scheme = "bearer",
+                    In = ParameterLocation.Header,
+                    Type = SecuritySchemeType.ApiKey,
+                };
+                options.AddSecurityDefinition("Bearer", securitySchema);
+
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement()
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Id = "Bearer",
+                                Type = ReferenceType.SecurityScheme
+                            }
+                        },  
+                        new List<string> { }
+                    }
+                });
+                
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 options.IncludeXmlComments(xmlPath);
-                
-                options.SchemaFilter<SwaggerFluentValidationSchemaFilter>();
             });
+        }
+
+        public static void AddAuthenticationConfiguration(this IServiceCollection services,
+            IConfiguration configuration)
+        {
+            var jwtOptions = new JwtOptions();
+            configuration.Bind(nameof(JwtOptions), jwtOptions);
+
+            var key = Encoding.UTF8.GetBytes(jwtOptions.SecretKey);
+
+            services.AddSingleton(jwtOptions);
+            services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
+                    options.RequireHttpsMetadata = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+
+                        ValidateIssuerSigningKey = true,
+
+                        ValidIssuer = jwtOptions.ValidIssuer,
+                        ValidAudience = jwtOptions.ValidAudience,
+
+                        IssuerSigningKey = new SymmetricSecurityKey(key)
+                    };
+                });
+            services.AddTransient<ITokenHelper, TokenHelper>();
         }
 
         public static void AddRepositories(this IServiceCollection services)

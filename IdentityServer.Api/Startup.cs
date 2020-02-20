@@ -20,7 +20,7 @@ namespace IdentityServer.Api
                 .AddJsonFile($"{settings}.{environment.EnvironmentName}.json", true, true);
 
             builder.AddEnvironmentVariables();
-            
+
             Configuration = builder.Build();
         }
 
@@ -36,13 +36,15 @@ namespace IdentityServer.Api
             services.AddApiVersioningConfiguration();
 
             services.AddAutoMapperConfiguration();
-            
-            services.AddDbContextConfiguration(Configuration);
-            
+
             services.AddControllersConfiguration();
-            
+
+            services.AddAuthenticationConfiguration(Configuration);
+
             services.AddSwaggerConfiguration();
-            
+
+            services.AddDbContextConfiguration(Configuration);
+
             services.AddRepositories();
         }
 
@@ -63,11 +65,12 @@ namespace IdentityServer.Api
                 options.RoutePrefix = "swagger";
                 options.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Server");
             });
-            
+
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
-
+            
             app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
     }
