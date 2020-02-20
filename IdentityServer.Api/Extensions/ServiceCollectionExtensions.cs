@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Reflection;
 using AutoMapper;
 using FluentValidation.AspNetCore;
 using IdentityServer.Data;
@@ -10,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 
 namespace IdentityServer.Api.Extensions
@@ -70,6 +74,22 @@ namespace IdentityServer.Api.Extensions
         public static void AddAutoMapperConfiguration(this IServiceCollection services)
         {
             services.AddAutoMapper(typeof(SignUpRequestMapping).Assembly);
+        }
+
+        public static void AddSwaggerConfiguration(this IServiceCollection services)
+        {
+            services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc("v1",new OpenApiInfo
+                {
+                    Title = "Identity Server",
+                    Version = "v1"
+                });
+                
+                var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+                options.IncludeXmlComments(xmlPath);
+            });
         }
 
         public static void AddRepositories(this IServiceCollection services)

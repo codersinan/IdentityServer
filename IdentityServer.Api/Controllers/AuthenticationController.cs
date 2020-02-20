@@ -45,7 +45,7 @@ namespace IdentityServer.Api.Controllers
             return BadRequest(ModelState);
         }
 
-        [HttpGet("activation/{activationToken}")]
+        [HttpGet("Activation/{activationToken}")]
         public IActionResult CheckActivationToken(string activationToken)
         {
             try
@@ -70,7 +70,7 @@ namespace IdentityServer.Api.Controllers
             return BadRequest(ModelState);
         }
 
-        [HttpPost("activation/{activationToken}")]
+        [HttpPost("Activation/{activationToken}")]
         public IActionResult ActivateAccount(string activationToken)
         {
             try

@@ -41,6 +41,8 @@ namespace IdentityServer.Api
             
             services.AddControllersConfiguration();
             
+            services.AddSwaggerConfiguration();
+            
             services.AddRepositories();
         }
 
@@ -55,6 +57,13 @@ namespace IdentityServer.Api
             app.UseHealthChecks("/health");
             app.UseCors("IdentityServer");
 
+            app.UseSwagger();
+            app.UseSwaggerUI(options =>
+            {
+                options.RoutePrefix = "swagger";
+                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Server");
+            });
+            
             app.UseRouting();
 
             app.UseAuthorization();
