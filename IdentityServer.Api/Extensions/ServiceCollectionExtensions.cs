@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using AutoMapper;
 using FluentValidation.AspNetCore;
+using IdentityServer.Api.Helpers;
 using IdentityServer.Data;
 using IdentityServer.Infrastructure.Interfaces;
 using IdentityServer.Infrastructure.Mappings;
@@ -89,6 +90,8 @@ namespace IdentityServer.Api.Extensions
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 options.IncludeXmlComments(xmlPath);
+                
+                options.SchemaFilter<SwaggerFluentValidationSchemaFilter>();
             });
         }
 
