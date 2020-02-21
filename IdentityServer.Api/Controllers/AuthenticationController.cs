@@ -28,7 +28,7 @@ namespace IdentityServer.Api.Controllers
         }
 
         [HttpPost("SignUp")]
-        public async Task<IActionResult> SignUp(SignUpRequest request)
+        public async Task<IActionResult> SignUp([FromBody]SignUpRequest request)
         {
             try
             {
@@ -94,7 +94,7 @@ namespace IdentityServer.Api.Controllers
         }
 
         [HttpPost("SignIn")]
-        public async Task<IActionResult> SignIn(SignInRequest request)
+        public async Task<IActionResult> SignIn([FromBody]SignInRequest request)
         {
             try
             {

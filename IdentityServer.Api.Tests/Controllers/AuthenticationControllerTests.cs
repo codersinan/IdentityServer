@@ -1,59 +1,93 @@
 using System;
 using System.IO;
 using System.Linq;
-using AutoMapper;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using FluentAssertions;
-using IdentityServer.Api.Controllers;
-using IdentityServer.Api.Extensions;
 using IdentityServer.Api.Security;
 using IdentityServer.Core.Entities;
 using IdentityServer.Data;
 using IdentityServer.Infrastructure.Interfaces;
-using IdentityServer.Infrastructure.Mappings;
-using IdentityServer.Infrastructure.Repositories;
 using IdentityServer.Infrastructure.RequestModels;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using IConfiguration = AutoMapper.Configuration.IConfiguration;
 
 namespace IdentityServer.Api.Tests.Controllers
 {
     [TestFixture]
     public class AuthenticationControllerTests
     {
-        private AuthenticationController _controller;
-        private ServiceProvider _serviceProvider;
+        private string controllerPath = "api/authentication";
+
+        private TestServer _server;
+        private HttpClient _client;
+        private IdentityServerContext _context;
+        private IAccountRepository _repository;
 
         [SetUp]
         public void SetUp()
         {
-            var settings = "appsettings";
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile($"{settings}.json");
-            var serviceCollection = new ServiceCollection();
-            serviceCollection.AddDbContext<IdentityServerContext>(options =>
-            {
-                options.UseInMemoryDatabase(Guid.NewGuid().ToString());
-            });
+            var guid = Guid.NewGuid().ToString();
+            var webHostBuilder = new WebHostBuilder()
+                .UseContentRoot(Directory.GetCurrentDirectory())
+                .UseEnvironment("Test")
+                .UseKestrel()
+                .UseStartup<Startup>()
+                .ConfigureTestServices(services =>
+                {
+                    services.AddDbContext<IdentityServerContext>(options =>
+                    {
+                        options.UseInMemoryDatabase(guid);
+                    });
+                })
+                .ConfigureServices(services =>
+                {
+                    services.AddDbContext<IdentityServerContext>(options =>
+                    {
+                        options.UseInMemoryDatabase(guid);
+                    });
+                });
 
-            serviceCollection.AddAutoMapper(typeof(SignUpRequestMapping).Assembly);
-            serviceCollection.AddTransient<IAccountRepository, AccountRepository>();
-            serviceCollection.AddControllersConfiguration();
-            serviceCollection.AddAuthenticationConfiguration(builder.Build());
-            _serviceProvider = serviceCollection.BuildServiceProvider();
+            _server = new TestServer(webHostBuilder);
 
-            var repository = _serviceProvider.GetService<IAccountRepository>();
-            var mapper = _serviceProvider.GetService<IMapper>();
-            var tokenHelper = _serviceProvider.GetService<ITokenHelper>();
-            _controller = new AuthenticationController(repository, mapper, tokenHelper);
+            _context = _server.Host.Services.GetService<IdentityServerContext>();
+            
+            _context.Database.EnsureDeleted();
+            _context.Database.EnsureCreated();
+            _repository = _server.Host.Services.GetService<IAccountRepository>();
+
+            _client = _server.CreateClient();
+            _client.BaseAddress = new Uri("http://localhost:5100");
         }
 
         [Test]
-        public void SignUpWithNewControllerWithoutConstructorParameters()
+        public void SignUpTestWithInvalidParameters()
+        {
+            // arrange
+            var request = new SignUpRequest
+            {
+                Username = "a",
+                UserMail = "a",
+                Password = "1",
+                ConfirmPassword = "123"
+            };
+
+            // act
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignUp",
+                request.ToHttpContent()
+            ).Result;
+
+            // assert
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+
+        [Test]
+        public void SignUpTestWithValidParameters()
         {
             // arrange
             var request = new SignUpRequest
@@ -64,30 +98,18 @@ namespace IdentityServer.Api.Tests.Controllers
                 ConfirmPassword = "123"
             };
 
-            var controller = new AuthenticationController(null, null, null);
             // act
+            var response = _client.PostAsync(
+                $"{controllerPath}/signup",
+                request.ToHttpContent()
+            ).Result;
 
             // assert
-            controller.SignUp(request).Result
-                .Should().BeOfType<BadRequestObjectResult>();
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
         [Test]
-        public void SignUpWithInvalidParameters()
-        {
-            // arrange
-            var request = new SignUpRequest
-            {
-            };
-            // act
-            _controller.ModelState.AddModelError("Exception", "Error");
-            // assert
-            _controller.SignUp(request).Result
-                .Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        [Test]
-        public void SignUpWithValidParameters()
+        public void SignUpTestWithValidParametersButAlreadyUsedUsername()
         {
             // arrange
             var request = new SignUpRequest
@@ -97,205 +119,299 @@ namespace IdentityServer.Api.Tests.Controllers
                 Password = "123",
                 ConfirmPassword = "123"
             };
-            // act
 
+            // act
+            var response = _client.PostAsync(
+                $"{controllerPath}/signup",
+                request.ToHttpContent()
+            ).Result;
+
+            response = _client.PostAsync(
+                $"{controllerPath}/signup",
+                request.ToHttpContent()
+            ).Result;
             // assert
-            _controller
-                .Invoking(m => m.SignUp(request))
-                .Invoke().Result
-                .Should().BeOfType<OkResult>();
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         [Test]
-        public void CheckActivationTokenWithNotAGuid()
+        public void CheckActivationTokenTestWithNotGuid()
         {
             // arrange
 
             // act
+            var response = _client.GetAsync($"{controllerPath}/Activation/{1}").Result;
 
             // assert
-            _controller
-                .Invoking(m => m.CheckActivationToken(string.Empty))
-                .Invoke()
-                .Should().BeOfType<BadRequestObjectResult>();
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         [Test]
-        public void CheckActivationTokenWithInvalidToken()
+        public void CheckActivationTokenTestWithWrongGuid()
         {
             // arrange
 
             // act
+            var response = _client.GetAsync($"{controllerPath}/Activation/{Guid.NewGuid()}").Result;
 
             // assert
-            _controller
-                .Invoking(m => m.CheckActivationToken(Guid.NewGuid().ToString()))
-                .Invoke()
-                .Should().BeOfType<BadRequestObjectResult>();
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         [Test]
-        public void CheckActivationTokenWithValidToken()
+        public void CheckActivatioTestTokenWithGuid()
         {
             // arrange
-            var request = new SignUpRequest
+            var account = new Account
             {
                 Username = "a",
                 UserMail = "a@a.com",
-                Password = "123",
-                ConfirmPassword = "123"
+                PasswordHash = "123"
             };
-            var context = _serviceProvider.GetService<IdentityServerContext>();
-            Account account = null;
+
             // act
-            _controller
-                .Invoking(m => m.SignUp(request))
-                .Invoke();
-            account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
+            _repository.SignUp(account);
+            Guid activationToken =
+                _context.Accounts.FirstOrDefault(x => x.Username == account.Username).ActivationToken;
+
             // assert
-            _controller
-                .Invoking(m => m.CheckActivationToken(account.ActivationToken.ToString()))
-                .Invoke()
-                .Should().BeOfType<OkResult>();
+
+            var response = _client.GetAsync(
+                $"{controllerPath}/Activation/{activationToken}"
+            ).Result;
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
         [Test]
-        public void ActivateAccountWithNotAGuid()
+        public void ActivateAccountTestWithInvalidToken()
         {
             // arrange
 
             // act
 
             // assert
-            _controller
-                .Invoking(m => m.ActivateAccount(string.Empty))
-                .Invoke()
-                .Should().BeOfType<BadRequestObjectResult>();
+            var response = _client.PostAsync(
+                $"{controllerPath}/Activation/{Guid.NewGuid()}", null
+            ).Result;
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         [Test]
-        public void ActivateAccountWithInvalidToken()
+        public void ActivateAccountTestWithValidToken()
         {
             // arrange
-
-            // act
-
-            // assert
-            _controller
-                .Invoking(m => m.ActivateAccount(Guid.NewGuid().ToString()))
-                .Invoke()
-                .Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        [Test]
-        public void ActivateAccountWithValidToken()
-        {
-            // arrange
-            var request = new SignUpRequest
+            var account = new Account
             {
                 Username = "a",
                 UserMail = "a@a.com",
-                Password = "123",
-                ConfirmPassword = "123"
+                PasswordHash = "123"
             };
-            var context = _serviceProvider.GetService<IdentityServerContext>();
-            Account account = null;
+
             // act
-            _controller
-                .Invoking(m => m.SignUp(request))
-                .Invoke();
-            account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
+            _repository.SignUpAsync(account);
+            Guid activationToken =
+                _context.Accounts.FirstOrDefault(x => x.Username == account.Username).ActivationToken;
+
             // assert
-            _controller
-                .Invoking(m => m.ActivateAccount(account.ActivationToken.ToString()))
-                .Invoke()
-                .Should().BeOfType<OkResult>();
+            var response = _client.PostAsync(
+                $"{controllerPath}/Activation/{activationToken}", null
+            ).Result;
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
         [Test]
-        public void SignInWithNewControllerWithoutConstructorParameters()
+        public void SignInTestWithWrongInformation()
         {
             // arrange
             var request = new SignInRequest
             {
                 Username = "a",
-                Password = "123",
+                Password = "1"
             };
-
-            var controller = new AuthenticationController(null, null, null);
             // act
 
             // assert
-            controller.SignIn(request).Result
-                .Should().BeOfType<BadRequestObjectResult>();
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignIn", request.ToHttpContent()
+            ).Result;
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
         [Test]
-        public void SignInWithInvalidParameters()
+        public void SignInTestWithWrongPassword()
         {
             // arrange
-            var request = new SignUpRequest
+            var request = new SignInRequest
             {
+                Username = "a",
+                Password = Guid.NewGuid().ToString()
             };
+
             // act
-            _controller.ModelState.AddModelError("Exception", "Error");
+            RegisterAccountAndActivate();
             // assert
-            _controller.SignUp(request).Result
-                .Should().BeOfType<BadRequestObjectResult>();
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignIn", request.ToHttpContent()
+            ).Result;
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         [Test]
-        public void SignInWithValidParametersButPasswordIsWrong()
+        public void SignInTestWithValidParameters()
         {
             // arrange
-            var request = new SignUpRequest
+
+            var request = new SignInRequest
+            {
+                Username = "a",
+                Password = "123"
+            };
+
+            // act
+            RegisterAccountAndActivate();
+            // assert
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignIn", request.ToHttpContent()
+            ).Result;
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var tokenResponse = response.ToObject<TokenResponse>();
+            tokenResponse.AccessToken.Should().NotBeNullOrEmpty();
+        }
+
+        [Test]
+        public void CurrentAccountTestWithoutAuthorizationHeader()
+        {
+            // arrange
+            var request = new SignInRequest
+            {
+                Username = "a",
+                Password = "123"
+            };
+            // act
+            RegisterAccountAndActivate();
+
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignIn", request.ToHttpContent()
+            ).Result;
+            var token = response.ToObject<TokenResponse>().AccessToken;
+
+            response = _client.GetAsync($"{controllerPath}/Account").Result;
+
+            // assert
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        [Test]
+        public void CurrentAccountTestWithAuthorizationToken()
+        {
+            // arrange
+            var request = new SignInRequest
+            {
+                Username = "a",
+                Password = "123"
+            };
+            // act
+            RegisterAccountAndActivate();
+
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignIn", request.ToHttpContent()
+            ).Result;
+            var token = response.ToObject<TokenResponse>().AccessToken;
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            response = _client.GetAsync($"{controllerPath}/Account").Result;
+
+
+            // assert
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        private void RegisterAccountAndActivate()
+        {
+            var account = new Account
             {
                 Username = "a",
                 UserMail = "a@a.com",
-                Password = "123",
-                ConfirmPassword = "123"
+                PasswordHash = "123"
             };
-            var context = _serviceProvider.GetService<IdentityServerContext>();
-            Account account = null;
-            // act
-            _controller
-                .Invoking(m => m.SignUp(request))
-                .Invoke();
-            account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
-            _controller.ActivateAccount(account.ActivationToken.ToString());
-            // assert
-            _controller.Invoking(m => m.SignIn(new SignInRequest
-                    {Username = "a", Password = request.Password.Insert(1, "wrong")}))
-                .Invoke().Result
-                .Should().BeOfType<UnauthorizedResult>();
+            _repository.SignUpAsync(account);
+            Guid activationToken =
+                _context.Accounts.FirstOrDefault(x => x.Username == account.Username).ActivationToken;
+            _client.PostAsync(
+                $"{controllerPath}/Activation/{activationToken}", null
+            );
         }
 
-        [Test]
-        public void SignInWithValidParameters()
-        {
-            // arrange
-            var request = new SignUpRequest
-            {
-                Username = "a",
-                UserMail = "a@a.com",
-                Password = "123",
-                ConfirmPassword = "123"
-            };
-            var context = _serviceProvider.GetService<IdentityServerContext>();
-            Account account = null;
-            // act
-            _controller
-                .Invoking(m => m.SignUp(request))
-                .Invoke();
-            account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
-            _controller.ActivateAccount(account.ActivationToken.ToString());
-            // assert
-
-            var result = _controller
-                .Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
-                .Invoke().Result;
-            result.Should().BeOfType<OkObjectResult>();
-            ((TokenResponse)((OkObjectResult) result).Value).AccessToken.Should().NotBeNull();
-        }
+        // [Test]
+        // public void CurrentAccountWithoutToken()
+        // {
+        //     // arrange
+        //     var request = new SignUpRequest
+        //     {
+        //         Username = "a",
+        //         UserMail = "a@a.com",
+        //         Password = "123",
+        //         ConfirmPassword = "123"
+        //     };
+        //     var context = _serviceProvider.GetService<IdentityServerContext>();
+        //     Account account = null;
+        //     string token = "";
+        //     // act
+        //     _controller
+        //         .Invoking(m => m.SignUp(request))
+        //         .Invoke();
+        //     account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
+        //     _controller.ActivateAccount(account.ActivationToken.ToString());
+        //     var result = _controller
+        //         .Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
+        //         .Invoke().Result;
+        //     result.Should().BeOfType<OkObjectResult>();
+        //     token = ((TokenResponse) ((OkObjectResult) result).Value).AccessToken;
+        //     // assert
+        //     token.Should().NotBeNullOrEmpty();
+        //
+        //     _controller.Invoking(m => m.CurrentAccount())
+        //         .Invoke().Should().BeOfType<UnauthorizedResult>();
+        // }
+        //
+        // [Test]
+        // public void CurrentAccountWithToken()
+        // {
+        //     // arrange
+        //     var request = new SignUpRequest
+        //     {
+        //         Username = "a",
+        //         UserMail = "a@a.com",
+        //         Password = "123",
+        //         ConfirmPassword = "123"
+        //     };
+        //     var context = _serviceProvider.GetService<IdentityServerContext>();
+        //     Account account = null;
+        //     string token = "";
+        //     // act
+        //     _controller
+        //         .Invoking(m => m.SignUp(request))
+        //         .Invoke();
+        //     account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
+        //     _controller.ActivateAccount(account.ActivationToken.ToString());
+        //     var result = _controller
+        //         .Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
+        //         .Invoke().Result;
+        //     result.Should().BeOfType<OkObjectResult>();
+        //     token = ((TokenResponse) ((OkObjectResult) result).Value).AccessToken;
+        //     // assert
+        //     token.Should().NotBeNullOrEmpty();
+        //
+        //     result = _controller.Invoking(m => m.CurrentAccount())
+        //         .Invoke();
+        //
+        //     var currentAccount = ((CurrentAccount) ((OkObjectResult) result).Value);
+        //     currentAccount.Should().NotBeNull();
+        //     currentAccount.Username.Should().BeNullOrEmpty();
+        //     currentAccount.Email.Should().BeNullOrEmpty();
+        //     currentAccount.CreatedAt.Should().NotBeAfter(DateTime.UtcNow);
+        // }
     }
 }

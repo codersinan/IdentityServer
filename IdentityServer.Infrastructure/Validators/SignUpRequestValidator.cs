@@ -12,7 +12,7 @@ namespace IdentityServer.Infrastructure.Validators
             RuleFor(e => e.Password).NotNull().NotEmpty().MinimumLength(3);
             RuleFor(e => e.ConfirmPassword).NotNull().NotEmpty().MinimumLength(3);
 
-            RuleFor(e => e.Password).Equal(e => e.ConfirmPassword);
+            RuleFor(e => e.ConfirmPassword).Equal(e => e.Password);
         }
     }
 }
