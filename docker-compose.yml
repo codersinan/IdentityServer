@@ -1,0 +1,40 @@
+version: '3'
+services:
+  identityserver-postgres:
+    container_name: 'identityserver-postgres'
+    image: 'postgres:12-alpine'
+    restart: always
+    ports:
+      - 5432:5432
+    hostname: "identityserver-postgres"
+    environment:
+      - POSTGRES_DB=IdentityServer
+      - POSTGRES_USER=identity
+      - POSTGRES_PASSWORD=server
+    volumes:
+      - ./postgres/init-db.sh:/docker-entrypoint-initdb.d/initdb.sh
+
+  identityserver-api:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile    
+    deploy:
+      replicas: 2
+    ports:
+      - 5000-5100:5000
+    expose:
+      - 5000
+    hostname: "identityserver-api"
+    depends_on:
+      - identityserver-postgres
+
+  identityserver-nginx:
+    container_name: 'identityserver-nginx'
+    image: nginx:latest    
+    ports:
+      - 4000:4000
+    hostname: "identityserver-nginx"
+    depends_on:
+      - identityserver-api
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro

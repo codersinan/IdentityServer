@@ -16,7 +16,7 @@ namespace IdentityServer.Data
             // Build config
             IConfiguration config = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory().Replace("Data", "Api"))
-                .AddJsonFile($"{settings}.json", optional: false)
+                .AddJsonFile($"{settings}.json", optional: true)
                 .AddJsonFile($"{settings}.{environment}.json", optional: true)
                 .Build();
             var optionsBuilder = new DbContextOptionsBuilder<IdentityServerContext>();

@@ -1,7 +1,7 @@
 version: '3'
 services:
-  identity-sonarqube-service:
-    container_name: 'identity-sonarqube'
+  identityserver-sonarqube-service:
+    container_name: 'identityserver-sonarqube'
     image: 'sonarqube:7.9-community'
     ports:
       - 9000:9000
