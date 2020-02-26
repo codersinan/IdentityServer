@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NUnit.Framework;
 
 namespace IdentityServer.Api.Tests.Controllers
@@ -39,6 +40,7 @@ namespace IdentityServer.Api.Tests.Controllers
                 .UseStartup<Startup>()
                 .ConfigureTestServices(services =>
                 {
+                    services.RemoveAll<IdentityServerContext>();
                     services.AddDbContext<IdentityServerContext>(options =>
                     {
                         options.UseInMemoryDatabase(guid);
@@ -46,6 +48,7 @@ namespace IdentityServer.Api.Tests.Controllers
                 })
                 .ConfigureServices(services =>
                 {
+                    services.RemoveAll<IdentityServerContext>();
                     services.AddDbContext<IdentityServerContext>(options =>
                     {
                         options.UseInMemoryDatabase(guid);
@@ -343,75 +346,5 @@ namespace IdentityServer.Api.Tests.Controllers
                 $"{controllerPath}/Activation/{activationToken}", null
             );
         }
-
-        // [Test]
-        // public void CurrentAccountWithoutToken()
-        // {
-        //     // arrange
-        //     var request = new SignUpRequest
-        //     {
-        //         Username = "a",
-        //         UserMail = "a@a.com",
-        //         Password = "123",
-        //         ConfirmPassword = "123"
-        //     };
-        //     var context = _serviceProvider.GetService<IdentityServerContext>();
-        //     Account account = null;
-        //     string token = "";
-        //     // act
-        //     _controller
-        //         .Invoking(m => m.SignUp(request))
-        //         .Invoke();
-        //     account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
-        //     _controller.ActivateAccount(account.ActivationToken.ToString());
-        //     var result = _controller
-        //         .Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
-        //         .Invoke().Result;
-        //     result.Should().BeOfType<OkObjectResult>();
-        //     token = ((TokenResponse) ((OkObjectResult) result).Value).AccessToken;
-        //     // assert
-        //     token.Should().NotBeNullOrEmpty();
-        //
-        //     _controller.Invoking(m => m.CurrentAccount())
-        //         .Invoke().Should().BeOfType<UnauthorizedResult>();
-        // }
-        //
-        // [Test]
-        // public void CurrentAccountWithToken()
-        // {
-        //     // arrange
-        //     var request = new SignUpRequest
-        //     {
-        //         Username = "a",
-        //         UserMail = "a@a.com",
-        //         Password = "123",
-        //         ConfirmPassword = "123"
-        //     };
-        //     var context = _serviceProvider.GetService<IdentityServerContext>();
-        //     Account account = null;
-        //     string token = "";
-        //     // act
-        //     _controller
-        //         .Invoking(m => m.SignUp(request))
-        //         .Invoke();
-        //     account = context.Accounts.FirstOrDefault(x => x.Username == request.Username);
-        //     _controller.ActivateAccount(account.ActivationToken.ToString());
-        //     var result = _controller
-        //         .Invoking(m => m.SignIn(new SignInRequest {Username = "a", Password = request.Password}))
-        //         .Invoke().Result;
-        //     result.Should().BeOfType<OkObjectResult>();
-        //     token = ((TokenResponse) ((OkObjectResult) result).Value).AccessToken;
-        //     // assert
-        //     token.Should().NotBeNullOrEmpty();
-        //
-        //     result = _controller.Invoking(m => m.CurrentAccount())
-        //         .Invoke();
-        //
-        //     var currentAccount = ((CurrentAccount) ((OkObjectResult) result).Value);
-        //     currentAccount.Should().NotBeNull();
-        //     currentAccount.Username.Should().BeNullOrEmpty();
-        //     currentAccount.Email.Should().BeNullOrEmpty();
-        //     currentAccount.CreatedAt.Should().NotBeAfter(DateTime.UtcNow);
-        // }
     }
 }
