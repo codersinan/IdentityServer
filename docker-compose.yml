@@ -18,8 +18,6 @@ services:
     build:
       context: ./
       dockerfile: ./Dockerfile    
-    deploy:
-      replicas: 2
     ports:
       - 5000-5100:5000
     expose:
