@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
-using System.Security.Principal;
 using System.Text;
 using IdentityServer.Core.Entities;
 using Microsoft.IdentityModel.Tokens;
@@ -23,12 +21,12 @@ namespace IdentityServer.Api.Security
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(_options.SecretKey);
-            
+
             var pairs = new List<KeyValuePair<string, string>>();
-            pairs.Add(new KeyValuePair<string, string>("Id",account.Id.ToString()));
-            pairs.Add(new KeyValuePair<string, string>("Username",account.Username));
-            pairs.Add(new KeyValuePair<string, string>("Email",account.UserMail));
-            
+            pairs.Add(new KeyValuePair<string, string>("Id", account.Id.ToString()));
+            pairs.Add(new KeyValuePair<string, string>("Username", account.Username));
+            pairs.Add(new KeyValuePair<string, string>("Email", account.UserMail));
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Issuer = _options.ValidIssuer,
@@ -40,20 +38,15 @@ namespace IdentityServer.Api.Security
                     SecurityAlgorithms.HmacSha256Signature)
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return new TokenResponse{AccessToken = tokenHandler.WriteToken(token)};
+            return new TokenResponse {AccessToken = tokenHandler.WriteToken(token)};
         }
-        
+
         private ClaimsIdentity GenerateClaimsIdentity(params KeyValuePair<string, string>[] values)
         {
-            var claims =
-                new ClaimsIdentity(new GenericIdentity(values.FirstOrDefault(x => x.Key == "Username").Value, "Token"));
-
+            var claims = new ClaimsIdentity();
             foreach (KeyValuePair<string, string> keyValuePair in values)
             {
-                if (keyValuePair.Key != "Username")
-                {
-                    claims.AddClaim(new Claim(keyValuePair.Key, keyValuePair.Value));
-                }
+                claims.AddClaim(new Claim(keyValuePair.Key, keyValuePair.Value));
             }
 
             claims.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
