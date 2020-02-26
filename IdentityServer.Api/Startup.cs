@@ -45,6 +45,8 @@ namespace IdentityServer.Api
 
             services.AddDbContextConfiguration(Configuration);
 
+            services.AddMailServerConfiguration(Configuration);
+            
             services.AddRepositories();
         }
 

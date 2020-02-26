@@ -12,6 +12,8 @@ using IdentityServer.Infrastructure.Interfaces;
 using IdentityServer.Infrastructure.Mappings;
 using IdentityServer.Infrastructure.Repositories;
 using IdentityServer.Infrastructure.RequestModels;
+using MailSender;
+using MailSender.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
@@ -168,6 +170,15 @@ namespace IdentityServer.Api.Extensions
         public static void AddRepositories(this IServiceCollection services)
         {
             services.AddTransient<IAccountRepository, AccountRepository>();
+        }
+        
+        public static void AddMailServerConfiguration(this IServiceCollection services, IConfiguration configuration)
+        {
+            var mailConfiguration = new MailConfiguration();
+            configuration.Bind("MailConfiguration", mailConfiguration);
+            services.AddSingleton<IMailConfiguration>(mailConfiguration);
+
+            services.AddTransient<IEMailService, CustomMailService>();
         }
     }
 }
