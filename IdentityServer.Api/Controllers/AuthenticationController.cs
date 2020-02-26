@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -7,6 +8,8 @@ using IdentityServer.Core.Entities;
 using IdentityServer.Infrastructure.Interfaces;
 using IdentityServer.Infrastructure.RequestModels;
 using IdentityServer.Infrastructure.ResponseModels;
+using MailSender.Interfaces;
+using MailSender.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,12 +21,14 @@ namespace IdentityServer.Api.Controllers
     {
         private readonly IAccountRepository _accountRepository;
         private readonly IMapper _mapper;
+        private readonly IEMailService _mailService;
         private readonly ITokenHelper _tokenHelper;
 
-        public AuthenticationController(IAccountRepository accountRepository, IMapper mapper,ITokenHelper tokenHelper)
+        public AuthenticationController(IAccountRepository accountRepository, IMapper mapper,IEMailService mailService,ITokenHelper tokenHelper)
         {
             _accountRepository = accountRepository;
             _mapper = mapper;
+            _mailService = mailService;
             _tokenHelper = tokenHelper;
         }
 
@@ -39,8 +44,8 @@ namespace IdentityServer.Api.Controllers
 
                 var account = _mapper.Map<Account>(request);
                 account = await _accountRepository.SignUpAsync(account);
-                // TODO Mail send integration
-
+                SendActivationMail(account);
+                
                 return Ok();
             }
             catch (Exception e)
@@ -141,6 +146,17 @@ namespace IdentityServer.Api.Controllers
 
             return BadRequest(ModelState);
         }
-        
+
+        private void SendActivationMail(Account account)
+        {
+            var mail = new EMailMessage
+            {
+                // TODO improve activation mail template 
+                Content = $"Activation token {account.ActivationToken}",
+                Subject = "Identity Server - Activation Mail",
+            };
+            mail.ToAddresses.Add(new EMailAddress{Name = account.Username,Address = account.UserMail});
+            _mailService.SendMail(mail);
+        }
     }
 }
