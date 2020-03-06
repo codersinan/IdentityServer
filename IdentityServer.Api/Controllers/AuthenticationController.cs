@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
+using CacheServer.Interfaces;
 using IdentityServer.Api.Security;
 using IdentityServer.Core.Entities;
 using IdentityServer.Infrastructure.Interfaces;
@@ -23,17 +23,20 @@ namespace IdentityServer.Api.Controllers
         private readonly IMapper _mapper;
         private readonly IEMailService _mailService;
         private readonly ITokenHelper _tokenHelper;
+        private readonly ICacheRepository _cacheRepository;
 
-        public AuthenticationController(IAccountRepository accountRepository, IMapper mapper,IEMailService mailService,ITokenHelper tokenHelper)
+        public AuthenticationController(IAccountRepository accountRepository, IMapper mapper, IEMailService mailService,
+            ITokenHelper tokenHelper, ICacheRepository cacheRepository)
         {
             _accountRepository = accountRepository;
             _mapper = mapper;
             _mailService = mailService;
             _tokenHelper = tokenHelper;
+            _cacheRepository = cacheRepository;
         }
 
         [HttpPost("SignUp")]
-        public async Task<IActionResult> SignUp([FromBody]SignUpRequest request)
+        public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
         {
             try
             {
@@ -45,7 +48,7 @@ namespace IdentityServer.Api.Controllers
                 var account = _mapper.Map<Account>(request);
                 account = await _accountRepository.SignUpAsync(account);
                 SendActivationMail(account);
-                
+
                 return Ok();
             }
             catch (Exception e)
@@ -99,7 +102,7 @@ namespace IdentityServer.Api.Controllers
         }
 
         [HttpPost("SignIn")]
-        public async Task<IActionResult> SignIn([FromBody]SignInRequest request)
+        public async Task<IActionResult> SignIn([FromBody] SignInRequest request)
         {
             try
             {
@@ -125,8 +128,8 @@ namespace IdentityServer.Api.Controllers
 
             return BadRequest(ModelState);
         }
-        
-        [HttpGet("Account"),Authorize]
+
+        [HttpGet("Account"), Authorize]
         public IActionResult CurrentAccount()
         {
             try
@@ -141,7 +144,37 @@ namespace IdentityServer.Api.Controllers
             }
             catch (Exception e)
             {
-                ModelState.AddModelError("Exception",e.Message);
+                ModelState.AddModelError("Exception", e.Message);
+            }
+
+            return BadRequest(ModelState);
+        }
+
+        [HttpGet("RefreshToken/{refreshToken}")]
+        public IActionResult RefreshToken(string refreshToken)
+        {
+            try
+            {
+                Guid.Parse(refreshToken);
+
+                var tokenCache = _cacheRepository.Read<TokenCache>(refreshToken);
+                if (tokenCache == null)
+                {
+                    return Unauthorized();
+                }
+
+                var security = _tokenHelper.ValidateAndDecode(tokenCache.Token);
+                var userId = security.Claims.FirstOrDefault(x => x.Type == "Id")?.Value;
+
+                if (userId == null) return Unauthorized();
+                Guid id = Guid.Parse(userId);
+                var account = _accountRepository.GetAccountById(id);
+
+                return Ok(_tokenHelper.GenerateToken(account, refreshToken));
+            }
+            catch (Exception e)
+            {
+                ModelState.AddModelError("Exception", e.Message);
             }
 
             return BadRequest(ModelState);
@@ -151,11 +184,11 @@ namespace IdentityServer.Api.Controllers
         {
             var mail = new EMailMessage
             {
-                // TODO improve activation mail template 
+                // improve activation mail template 
                 Content = $"Activation token {account.ActivationToken}",
                 Subject = "Identity Server - Activation Mail",
             };
-            mail.ToAddresses.Add(new EMailAddress{Name = account.Username,Address = account.UserMail});
+            mail.ToAddresses.Add(new EMailAddress {Name = account.Username, Address = account.UserMail});
             _mailService.SendMail(mail);
         }
     }

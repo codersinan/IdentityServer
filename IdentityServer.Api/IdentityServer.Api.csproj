@@ -18,6 +18,7 @@
       <ProjectReference Include="..\IdentityServer.Data\IdentityServer.Data.csproj" />
       <ProjectReference Include="..\IdentityServer.Infrastructure\IdentityServer.Infrastructure.csproj" />
       <ProjectReference Include="..\MailSender\MailSender.csproj" />
+      <ProjectReference Include="..\RedisCacheServer\RedisCacheServer.csproj" />
     </ItemGroup>
 
     <ItemGroup>
