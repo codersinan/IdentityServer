@@ -6,7 +6,7 @@ services:
     restart: always
     ports:
       - 5432:5432
-    hostname: "identityserver-postgres"
+    hostname: 'identityserver-postgres'
     environment:
       - POSTGRES_DB=IdentityServer
       - POSTGRES_USER=identity
@@ -16,23 +16,37 @@ services:
 
   identityserver-api:
     build:
+#    container_name: 'identityserver-api' # don't use for multiple container
       context: ./
       dockerfile: ./Dockerfile    
     ports:
       - 5000-5100:5000
     expose:
       - 5000
-    hostname: "identityserver-api"
+    hostname: 'identityserver-api'
     depends_on:
       - identityserver-postgres
 
-  identityserver-nginx:
-    container_name: 'identityserver-nginx'
-    image: nginx:latest    
-    ports:
-      - 4000:4000
-    hostname: "identityserver-nginx"
-    depends_on:
-      - identityserver-api
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#  identityserver-nginx:
+#    container_name: 'identityserver-nginx'
+#    image: nginx:latest    
+#    ports:
+#      - 4000:4000
+#    hostname: 'identityserver-nginx'
+#    depends_on:
+#      - identityserver-api
+#    volumes:
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  identityserver-redis:
+      container_name: 'identityserver-redis'
+      image: 'redis:5-alpine'
+      restart: always
+      ports:
+      - 6379:6379
+      hostname: 'identityserver-redis'
+      environment:
+        - ALLOW_EMPTY_PASSWORD=no
+        - REDIS_MASTER_PASSWORD=identityserver
+        - REDIS_PASSWORD=server
+  

@@ -4,17 +4,22 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using CacheServer.Interfaces;
 using FluentAssertions;
 using IdentityServer.Api.Security;
 using IdentityServer.Core.Entities;
 using IdentityServer.Data;
 using IdentityServer.Infrastructure.Interfaces;
 using IdentityServer.Infrastructure.RequestModels;
+using MailSender.Interfaces;
+using MailSender.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Moq;
 using NUnit.Framework;
 
 namespace IdentityServer.Api.Tests.Controllers
@@ -22,17 +27,27 @@ namespace IdentityServer.Api.Tests.Controllers
     [TestFixture]
     public class AuthenticationControllerTests
     {
-        private string controllerPath = "api/authentication";
+        private string controllerPath = "/api/authentication";
 
         private TestServer _server;
         private HttpClient _client;
         private IdentityServerContext _context;
         private IAccountRepository _repository;
 
+        private TokenCache _tokenCache = new TokenCache();
+
         [SetUp]
         public void SetUp()
         {
             var guid = Guid.NewGuid().ToString();
+
+            var mockMailSender = new Mock<IEMailService>();
+            mockMailSender.Setup(x => x.SendMail(It.IsAny<EMailMessage>()));
+            var mockCacheRepository = new Mock<ICacheRepository>();
+            mockCacheRepository
+                .Setup(x => x.Read<TokenCache>(It.IsAny<string>()))
+                .Returns(_tokenCache);
+
             var webHostBuilder = new WebHostBuilder()
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .UseEnvironment("Test")
@@ -41,30 +56,40 @@ namespace IdentityServer.Api.Tests.Controllers
                 .ConfigureTestServices(services =>
                 {
                     services.RemoveAll<IdentityServerContext>();
-                    services.AddDbContext<IdentityServerContext>(options =>
-                    {
-                        options.UseInMemoryDatabase(guid);
-                    });
+                    services.AddDbContext<IdentityServerContext>(options => { options.UseInMemoryDatabase(guid); });
+                    
+                    services.RemoveAll<IEMailService>();
+                    services.AddSingleton(mockMailSender.Object);
+                    
+                    services.RemoveAll<IDistributedCache>();
+                    services.AddDistributedMemoryCache();
                 })
                 .ConfigureServices(services =>
                 {
                     services.RemoveAll<IdentityServerContext>();
-                    services.AddDbContext<IdentityServerContext>(options =>
-                    {
-                        options.UseInMemoryDatabase(guid);
-                    });
+                    services.AddDbContext<IdentityServerContext>(options => { options.UseInMemoryDatabase(guid); });
+
+
+                    services.RemoveAll<IEMailService>();
+                    services.AddSingleton(mockMailSender.Object);
+
+                    services.RemoveAll<IDistributedCache>();
+                    services.AddDistributedMemoryCache();
                 });
+
 
             _server = new TestServer(webHostBuilder);
 
-            _context = _server.Host.Services.GetService<IdentityServerContext>();
-            
+            _context = _server.Services.GetService<IdentityServerContext>();
+
             _context.Database.EnsureDeleted();
             _context.Database.EnsureCreated();
-            _repository = _server.Host.Services.GetService<IAccountRepository>();
+            _repository = _server.Services.GetService<IAccountRepository>();
 
             _client = _server.CreateClient();
-            _client.BaseAddress = new Uri("http://localhost:5100");
+            // _client.DefaultRequestHeaders.Accept.Clear();
+            // _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            // _client.BaseAddress = new Uri("http://localhost");
         }
 
         [Test]
@@ -78,13 +103,11 @@ namespace IdentityServer.Api.Tests.Controllers
                 Password = "1",
                 ConfirmPassword = "123"
             };
-
             // act
             var response = _client.PostAsync(
                 $"{controllerPath}/SignUp",
                 request.ToHttpContent()
             ).Result;
-
             // assert
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
@@ -100,13 +123,11 @@ namespace IdentityServer.Api.Tests.Controllers
                 Password = "123",
                 ConfirmPassword = "123"
             };
-
             // act
             var response = _client.PostAsync(
                 $"{controllerPath}/signup",
                 request.ToHttpContent()
             ).Result;
-
             // assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
@@ -122,7 +143,6 @@ namespace IdentityServer.Api.Tests.Controllers
                 Password = "123",
                 ConfirmPassword = "123"
             };
-
             // act
             var response = _client.PostAsync(
                 $"{controllerPath}/signup",
@@ -144,7 +164,6 @@ namespace IdentityServer.Api.Tests.Controllers
 
             // act
             var response = _client.GetAsync($"{controllerPath}/Activation/{1}").Result;
-
             // assert
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -157,9 +176,7 @@ namespace IdentityServer.Api.Tests.Controllers
 
             // act
             var response = _client.GetAsync($"{controllerPath}/Activation/{Guid.NewGuid()}").Result;
-
             // assert
-
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
 
@@ -180,7 +197,6 @@ namespace IdentityServer.Api.Tests.Controllers
                 _context.Accounts.FirstOrDefault(x => x.Username == account.Username).ActivationToken;
 
             // assert
-
             var response = _client.GetAsync(
                 $"{controllerPath}/Activation/{activationToken}"
             ).Result;
@@ -216,7 +232,6 @@ namespace IdentityServer.Api.Tests.Controllers
             _repository.SignUpAsync(account);
             Guid activationToken =
                 _context.Accounts.FirstOrDefault(x => x.Username == account.Username).ActivationToken;
-
             // assert
             var response = _client.PostAsync(
                 $"{controllerPath}/Activation/{activationToken}", null
@@ -265,13 +280,11 @@ namespace IdentityServer.Api.Tests.Controllers
         public void SignInTestWithValidParameters()
         {
             // arrange
-
             var request = new SignInRequest
             {
                 Username = "a",
                 Password = "123"
             };
-
             // act
             RegisterAccountAndActivate();
             // assert
@@ -302,7 +315,6 @@ namespace IdentityServer.Api.Tests.Controllers
             var token = response.ToObject<TokenResponse>().AccessToken;
 
             response = _client.GetAsync($"{controllerPath}/Account").Result;
-
             // assert
             response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
@@ -316,19 +328,58 @@ namespace IdentityServer.Api.Tests.Controllers
                 Username = "a",
                 Password = "123"
             };
+
             // act
             RegisterAccountAndActivate();
 
             var response = _client.PostAsync(
                 $"{controllerPath}/SignIn", request.ToHttpContent()
             ).Result;
-            var token = response.ToObject<TokenResponse>().AccessToken;
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var tokenResponse = response.ToObject<TokenResponse>();
+            _client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
             response = _client.GetAsync($"{controllerPath}/Account").Result;
-
-
             // assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        [Test]
+        public void RefreshToken_Renew()
+        {
+            // arrange
+            var request = new SignInRequest
+            {
+                Username = "a",
+                Password = "123"
+            };
+            // act
+            RegisterAccountAndActivate();
+
+            var response = _client.PostAsync(
+                $"{controllerPath}/SignIn", request.ToHttpContent()
+            ).Result;
+
+            var tokenResponse = response.ToObject<TokenResponse>();
+
+            var refreshTokenResponse = _client.GetAsync(
+                $"{controllerPath}/RefreshToken/{tokenResponse.RefreshToken}"
+            ).Result;
+
+            _tokenCache = new TokenCache
+            {
+                Token = tokenResponse.RefreshToken,
+                Username = request.Username
+            };
+
+            var renewedTokenResponse = response.ToObject<TokenResponse>();
+            // assert
+            refreshTokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            tokenResponse.RefreshToken.Should().NotBeNullOrEmpty();
+
+            renewedTokenResponse.RefreshToken.Should().NotBeNullOrEmpty();
+
+            renewedTokenResponse.RefreshToken.Should().Be(tokenResponse.RefreshToken);
         }
 
         private void RegisterAccountAndActivate()
